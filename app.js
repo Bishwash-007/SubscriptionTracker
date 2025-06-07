@@ -31,7 +31,7 @@ app.get("/", (req, res) => {
 
 app.listen(PORT, async () => {
   console.log(`Server running on port https://localhost:${PORT}`);
-  await connectToDatabase();
+  await connectedtodb();
 });
 
 export default app;
