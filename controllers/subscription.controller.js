@@ -1,3 +1,5 @@
+import { SERVER_URL } from "../config/env.js";
+import { workflowClient } from "../config/upstash.js";
 import Subscription from "../models/subscription.model.js";
 
 export const createSubscription = async (req, res, next) => {
@@ -6,6 +8,18 @@ export const createSubscription = async (req, res, next) => {
       ...req.body,
       user: req.user._id,
     });
+
+    await workflowClient.trigger({
+      url: `${SERVER_URL}/api/v1/workflows/subscription/reminder`,
+      body: {
+        subscriptionId: subscription._id,
+      },
+      headers: {
+        "content-type": "application/json",
+      },
+      retries: 0,
+    });
+
     res.status(201).json({
       success: true,
       data: subscription,
@@ -46,13 +60,15 @@ export const getAllSubscriptions = async (req, res, next) => {
     console.log(`Error in getAllSubscriptions: ${error}`);
     next(error);
   }
-}
+};
 
 export const getSubscriptionById = async (req, res, next) => {
   try {
     const subscription = await Subscription.findById(req.params.id);
     if (!subscription) {
-      const error = new Error(`Subscription not found with id: ${req.params.id}`);
+      const error = new Error(
+        `Subscription not found with id: ${req.params.id}`
+      );
       error.statusCode = 404;
       throw error;
     }
@@ -64,4 +80,4 @@ export const getSubscriptionById = async (req, res, next) => {
     console.log(`Error in getSubscriptionById: ${error}`);
     next(error);
   }
-}
+};

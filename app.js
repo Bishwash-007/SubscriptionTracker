@@ -26,11 +26,11 @@ app.use("/api/v1/workflows", workflowRouter);
 app.use(errorMiddleware);
 
 app.get("/", (req, res) => {
-  res.send("Welcome to the Subscription Tracker!!");
+  res.json("Welcome to the Subscription Tracker!!");
 });
 
 app.listen(PORT, async () => {
-  console.log(`Server running on port https://localhost:${PORT}`);
+  console.log(`Server running on port http://localhost:${PORT}`);
   await connectToDB();
 });
 

@@ -1,6 +1,6 @@
 import { config } from "dotenv";
 
-config({ path: `.env.${process.NODE_ENV || "development"}.local` });
+config({ path: `.env.${process.env.NODE_ENV || "development"}.local` });
 
 export const {
   PORT,
@@ -12,4 +12,7 @@ export const {
   ARCJET_ENV,
   QSTASH_TOKEN,
   QSTASH_URL,
+  SERVER_URL,
+  EMAIL_USER,
+  EMAIL_PASS,
 } = process.env;
