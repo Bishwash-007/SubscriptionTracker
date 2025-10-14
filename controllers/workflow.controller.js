@@ -1,7 +1,5 @@
 import dayjs from "dayjs";
-import { createRequire } from "module";
-const require = createRequire(import.meta.url);
-const { serve } = require("@upstash/workflow/express");
+import { serve } from "@upstash/workflow/express";
 
 import Subscription from "../models/subscription.model.js";
 
