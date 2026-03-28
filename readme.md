@@ -1,267 +1,239 @@
 # Subscription Tracker API
 
-This document describes the HTTP interface exposed by the Subscription Tracker service. It covers authentication, request/response formats, and every routed endpoint present in the current codebase.
+A RESTful API for tracking subscriptions and managing renewal reminders. Built with Node.js, Express, MongoDB, and Upstash Workflow.
 
-## Base Configuration
+## Features
 
-| Setting | Value |
-| --- | --- |
-| Default base URL | `http://localhost:<PORT>` (see `.env.<NODE_ENV>.local`) |
-| API prefix | `/api/v1` |
-| Auth scheme | Bearer JWT in the `Authorization` header |
-| Content type | JSON payloads with `Content-Type: application/json` |
+- **User Authentication**: JWT-based authentication with signup, signin, and signout
+- **Subscription Management**: Create, read, update, delete, and cancel subscriptions
+- **Automated Reminders**: Automated email reminders 7, 5, 2, and 1 days before renewal
+- **Rate Limiting**: Express rate limiting to prevent abuse
+- **Authorization**: Protected routes with user authentication
+- **Upcoming Renewals**: Get subscriptions with upcoming renewal dates
 
-### Environment Variables
+## Tech Stack
 
-Populate `.env.development.local` (or the file that matches `NODE_ENV`) with:
+- **Runtime**: Node.js
+- **Framework**: Express.js
+- **Database**: MongoDB with Mongoose
+- **Authentication**: JWT (JSON Web Tokens)
+- **Background Jobs**: Upstash Workflow
+- **Email**: Nodemailer
+- **Security**: Express Rate Limit
 
-- `PORT` (number)
-- `DATABASE_URI`
-- `JWT_SECRET`
-- `JWT_EXPIRES_IN` (e.g., `7d`)
-- `ARCJET_KEY`, `ARCJET_ENV`
-- `QSTASH_TOKEN`, `QSTASH_URL`
-- `SERVER_URL` (publicly reachable base used by Upstash callbacks)
-- `EMAIL_USER`, `EMAIL_PASS`
+## Prerequisites
 
-### Error Envelope
+- Node.js 18+
+- MongoDB database (local or Atlas)
+- Gmail account (for email notifications)
+- Upstash account (for workflow scheduling)
 
-All controllers propagate errors to Express error middleware. Successful responses use:
+## Installation
 
-```json
-{
-  "success": true,
-  "message": "Optional message",
-  "data": { /* payload */ }
-}
+1. Clone the repository:
+
+```bash
+git clone <repository-url>
+cd subscription-tracker
 ```
 
-Failures set `success: false` and an HTTP status code that matches the thrown error (`401`, `404`, etc.).
+2. Install dependencies:
 
-## Authentication
+```bash
+npm install
+```
 
-- Tokens are issued by `POST /api/v1/auth/sign-in` and `POST /api/v1/auth/sign-up`.
-- Include the token in `Authorization: Bearer <JWT>` for protected routes.
-- The JWT payload contains `userId`. Middleware resolves the full user document and stores it on `req.user`.
+3. Create environment files:
+
+```bash
+touch .env.development.local
+```
+
+4. Add environment variables (see Configuration section below)
+
+5. Start the server:
+
+```bash
+# Development
+npm run dev
+
+# Production
+npm start
+```
+
+## Configuration
+
+Create `.env.development.local` with the following variables:
+
+```env
+PORT=3000
+NODE_ENV=development
+DATABASE_URI=mongodb+srv://username:password@cluster.mongodb.net/subscription-tracker
+JWT_SECRET=your-super-secret-jwt-key
+JWT_EXPIRES_IN=7d
+QSTASH_TOKEN=your-upstash-token
+QSTASH_URL=https://qstash.upstash.io/v1/publish
+SERVER_URL=https://your-api-url.com
+EMAIL_USER=your-email@gmail.com
+EMAIL_PASS=your-app-password
+```
+
+### Email Setup (Gmail)
+
+To use Gmail for sending emails:
+
+1. Enable 2-Factor Authentication on your Google account
+2. Generate an App Password at https://myaccount.google.com/apppasswords
+3. Use the generated password as `EMAIL_PASS`
+
+### Upstash Setup
+
+1. Sign up at https://upstash.com/
+2. Create a new QStash project
+3. Copy your token to `QSTASH_TOKEN`
+
+## Project Structure
+
+```
+├── config/
+│   ├── env.js          # Environment variables
+│   └── upstash.js      # Upstash workflow client
+├── controllers/        # HTTP request handlers
+│   ├── auth.controller.js
+│   ├── subscription.controller.js
+│   ├── user.controller.js
+│   └── workflow.controller.js
+├── middlewares/
+│   ├── auth.middleware.js    # JWT authentication
+│   ├── error.middleware.js   # Global error handler
+│   └── rateLimit.middleware.js
+├── models/
+│   ├── user.model.js
+│   └── subscription.model.js
+├── routes/
+│   ├── auth.routes.js
+│   ├── subscription.routes.js
+│   ├── user.routes.js
+│   └── workflow.routes.js
+├── services/           # Business logic
+│   ├── auth.service.js
+│   ├── subscription.service.js
+│   └── user.service.js
+├── utils/
+│   └── send-email.js   # Email utility
+├── app.js              # Express app entry point
+└── package.json
+```
+
+## API Endpoints
+
+### Authentication
+
+| Method | Endpoint | Description | Auth Required |
+|--------|----------|-------------|---------------|
+| POST | `/api/v1/auth/sign-up` | Register new user | No |
+| POST | `/api/v1/auth/sign-in` | Login user | No |
+| POST | `/api/v1/auth/sign-out` | Logout user | No |
+
+### Users
+
+| Method | Endpoint | Description | Auth Required |
+|--------|----------|-------------|---------------|
+| GET | `/api/v1/users` | Get all users | No |
+| GET | `/api/v1/users/:id` | Get user by ID | Yes |
+| PUT | `/api/v1/users/:id` | Update user | Yes |
+| DELETE | `/api/v1/users/:id` | Delete user | Yes |
+
+### Subscriptions
+
+| Method | Endpoint | Description | Auth Required |
+|--------|----------|-------------|---------------|
+| GET | `/api/v1/subscriptions` | Get all subscriptions | Yes |
+| GET | `/api/v1/subscriptions/upcoming-renewals` | Get upcoming renewals | Yes |
+| GET | `/api/v1/subscriptions/:id` | Get subscription by ID | Yes |
+| POST | `/api/v1/subscriptions` | Create subscription | Yes |
+| PUT | `/api/v1/subscriptions/:id` | Update subscription | Yes |
+| DELETE | `/api/v1/subscriptions/:id` | Delete subscription | Yes |
+| PUT | `/api/v1/subscriptions/:id/cancel` | Cancel subscription | Yes |
+| GET | `/api/v1/subscriptions/user/:id` | Get user's subscriptions | Yes |
 
 ## Data Models
 
 ### User
 
-| Field | Type | Notes |
-| --- | --- | --- |
-| `name` | string (2-50 chars) | required |
-| `email` | unique string | lowercased, validated |
-| `password` | string (>=6 chars) | stored hashed |
-| Timestamps | `createdAt`, `updatedAt` | auto-managed |
+```javascript
+{
+  name: String (required, min: 2, max: 50),
+  email: String (required, unique, lowercase),
+  password: String (required, min: 6),
+  createdAt: Date,
+  updatedAt: Date
+}
+```
 
 ### Subscription
 
-| Field | Type | Notes |
-| --- | --- | --- |
-| `name` | string | required |
-| `price` | number | must be > 0 |
-| `currency` | enum (`USD`, `EUR`, `GBP`) | defaults `USD` |
-| `frequency` | enum (`daily`, `weekly`, `monthly`, `yearly`) | required for renewal math |
-| `category` | enum (`sports`, `news`, `entertainment`, `lifestyle`, `technology`, `finance`, `politics`, `other`) | required |
-| `paymentMethod` | string | required |
-| `status` | enum (`active`, `cancelled`, `expired`) | defaults `active`, auto-updated when renewal lapses |
-| `startDate` | date | must be in the past |
-| `renewalDate` | date | defaults to `startDate + frequency`, must be after `startDate` |
-| `user` | ObjectId | references `User`, required |
-
-## Endpoint Reference
-
-### Auth Routes (`/api/v1/auth`)
-
-| Method | Path | Auth | Description |
-| --- | --- | --- | --- |
-| POST | `/sign-up` | none | Register a user and immediately return a JWT. |
-| POST | `/sign-in` | none | Verify credentials and return a JWT. |
-| POST | `/sign-out` | n/a | Route declared but controller not implemented; calling it will throw until `signOut` exists. |
-
-#### POST /api/v1/auth/sign-up
-
-Request body:
-
-```json
+```javascript
 {
-  "name": "Ava Harper",
-  "email": "ava@example.com",
-  "password": "secret123"
+  name: String (required, min: 2, max: 100),
+  price: Number (required, min: 0),
+  currency: String (enum: ['USD', 'EUR', 'GBP'], default: 'USD'),
+  frequency: String (enum: ['daily', 'weekly', 'monthly', 'yearly']),
+  category: String (enum: ['sports', 'news', 'entertainment', 'lifestyle', 'technology', 'finance', 'politics', 'other']),
+  paymentMethod: String (required),
+  status: String (enum: ['active', 'cancelled', 'expired'], default: 'active'),
+  startDate: Date (required, must be in past),
+  renewalDate: Date (must be after startDate),
+  user: ObjectId (reference to User),
+  createdAt: Date,
+  updatedAt: Date
 }
 ```
 
-Success (201):
+## Automated Reminders
+
+When a subscription is created, the system automatically schedules email reminders:
+
+- **7 days before renewal**
+- **5 days before renewal**
+- **2 days before renewal**
+- **1 day before renewal**
+
+Reminders are sent to the email address associated with the user account.
+
+## Rate Limiting
+
+API requests are limited to **10 requests per 10 seconds per IP** to prevent abuse.
+
+## Scripts
+
+```bash
+npm start       # Start production server
+npm run dev     # Start development server with nodemon
+npm run lint    # Run ESLint
+npm run format  # Format code with Prettier
+```
+
+## Error Handling
+
+The API returns consistent error responses:
 
 ```json
 {
-  "sucess": true,
-  "message": "User created successfully",
-  "data": {
-    "token": "<jwt>",
-    "user": {
-      "_id": "...",
-      "name": "Ava Harper",
-      "email": "ava@example.com",
-      "password": "<hashed>",
-      "createdAt": "...",
-      "updatedAt": "...",
-      "__v": 0
-    }
-  }
+  "success": false,
+  "message": "Error description"
 }
 ```
 
-#### POST /api/v1/auth/sign-in
+Common HTTP status codes:
+- `200` - Success
+- `201` - Created
+- `400` - Bad Request
+- `401` - Unauthorized
+- `404` - Not Found
+- `429` - Too Many Requests
+- `500` - Internal Server Error
 
-Request body:
+## License
 
-```json
-{
-  "email": "ava@example.com",
-  "password": "secret123"
-}
-```
-
-Success (200):
-
-```json
-{
-  "success": true,
-  "message": "User logged in successfully",
-  "data": {
-    "token": "<jwt>",
-    "user": { /* full user document */ }
-  }
-}
-```
-
-Errors include 404 (user not found) and 401 (invalid password).
-
-### User Routes (`/api/v1/users`)
-
-| Method | Path | Auth | Notes |
-| --- | --- | --- | --- |
-| GET | `/` | none | Returns every user document (including hashed passwords). Use cautiously. |
-| GET | `/:id` | required | Returns a single user without the `password` field. No ownership check is enforced. |
-| POST | `/` | n/a | Placeholder, responds with `"Create New User..."`. |
-| PUT | `/:id` | n/a | Placeholder, responds with `"Update user..."`. |
-| DELETE | `/:id` | n/a | Placeholder, responds with `"Delete a user..."`. |
-
-#### GET /api/v1/users
-
-Response (200):
-
-```json
-{
-  "success": true,
-  "data": [
-    {
-      "_id": "...",
-      "name": "...",
-      "email": "...",
-      "password": "<hashed>",
-      "createdAt": "...",
-      "updatedAt": "...",
-      "__v": 0
-    }
-  ]
-}
-```
-
-#### GET /api/v1/users/:id
-
-- Requires `Authorization: Bearer <jwt>`.
-- Responds with the same structure as above but without the `password` property.
-
-### Subscription Routes (`/api/v1/subscriptions`)
-
-| Method | Path | Auth | Description |
-| --- | --- | --- | --- |
-| GET | `/` | required | Returns every subscription, no pagination. |
-| POST | `/` | required | Creates a subscription linked to the authenticated user and schedules reminder workflows. |
-| GET | `/:id` | required | Fetch a single subscription by Mongo `_id`. |
-| GET | `/user/:id` | required | Fetch all subscriptions for a user. Controller enforces `req.user.id === :id`. |
-| PUT | `/:id` | n/a | Placeholder response only. |
-| DELETE | `/:id` | n/a | Placeholder response only. |
-| PUT | `/:id/cancel` | n/a | Placeholder response only. |
-| GET | `/upcoming-renewals` | n/a | Placeholder response only. |
-
-#### POST /api/v1/subscriptions
-
-Request body example:
-
-```json
-{
-  "name": "Spotify Premium",
-  "price": 12.99,
-  "currency": "USD",
-  "frequency": "monthly",
-  "category": "entertainment",
-  "paymentMethod": "visa-1234",
-  "status": "active",
-  "startDate": "2024-01-01T00:00:00.000Z",
-  "renewalDate": "2024-02-01T00:00:00.000Z"
-}
-```
-
-Notes:
-
-- `user` is injected from the authenticated request and cannot be overridden by the client.
-- If `renewalDate` is omitted, the model will calculate it from `startDate` and `frequency`.
-- A background workflow is triggered via Upstash to send reminder emails at 7, 5, 2, and 1 days before renewal.
-
-Success (201):
-
-```json
-{
-  "success": true,
-  "data": {
-    "_id": "...",
-    "name": "Spotify Premium",
-    "user": "<current user id>",
-    "status": "active",
-    "renewalDate": "2024-02-01T00:00:00.000Z",
-    "createdAt": "...",
-    "updatedAt": "...",
-    "__v": 0
-  }
-}
-```
-
-#### GET /api/v1/subscriptions/user/:id
-
-- Requires `Authorization: Bearer <jwt>`.
-- If the path `:id` does not match `req.user.id`, the controller throws 401.
-- Response mirrors the structure from the collection endpoint.
-
-### Workflow Routes (`/api/v1/workflows`)
-
-| Method | Path | Auth | Description |
-| --- | --- | --- | --- |
-| POST | `/subscription/reminder` | internal | Triggered by Upstash Workflow to send reminder emails. |
-
-`sendReminders` uses the Upstash Workflow `serve` helper. It expects a payload like:
-
-```json
-{
-  "subscriptionId": "<mongo id>"
-}
-```
-
-Flow:
-
-1. Fetch the subscription with populated user fields.
-2. Skip processing if `status !== 'active'` or renewal date already passed.
-3. For each day offset in `[7, 5, 2, 1]`:
-   - Sleep until the reminder timestamp.
-   - Send an email via `sendReminderEmail` when the day matches.
-
-## Notes and Limitations
-
-- `POST /api/v1/auth/sign-out` is wired in the router but there is no controller implementation in `auth.controller.js`.
-- Several user and subscription routes return placeholder JSON. Treat them as not implemented.
-- `GET /api/v1/users` exposes hashed passwords; restrict access before production use.
-- There is no rate limiting or pagination yet.
-- Upstash workflow requests must be authenticated separately (for example via QStash signatures); the current code assumes trusted requests.
+MIT

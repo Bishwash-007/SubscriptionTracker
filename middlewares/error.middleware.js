@@ -1,5 +1,3 @@
-// create a subscription -> middleware(check for renewal data) -> middleware(check for errors) -> next -> controller -> response
-
 const errorMiddleware = (err, req, res, next) => {
   try {
     let error = { ...err };

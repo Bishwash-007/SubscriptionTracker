@@ -5,37 +5,21 @@ import {
   getAllSubscriptions,
   getSubscriptionById,
   getUserSubscriptions,
+  updateSubscription,
+  deleteSubscription,
+  cancelSubscription,
+  getUpcomingRenewals,
 } from '../controllers/subscription.controller.js';
 
 const subscriptionRouter = Router();
 
 subscriptionRouter.get('/', authorize, getAllSubscriptions);
-
+subscriptionRouter.get('/upcoming-renewals', authorize, getUpcomingRenewals);
 subscriptionRouter.get('/:id', authorize, getSubscriptionById);
-
-subscriptionRouter.put('/:id', (req, res) =>
-  res.send({
-    title: 'Update subscription....',
-  })
-);
-
+subscriptionRouter.put('/:id', authorize, updateSubscription);
 subscriptionRouter.post('/', authorize, createSubscription);
-
-subscriptionRouter.delete('/:id', (req, res) =>
-  res.send({
-    title: 'Delete a subscription....',
-  })
-);
+subscriptionRouter.delete('/:id', authorize, deleteSubscription);
 subscriptionRouter.get('/user/:id', authorize, getUserSubscriptions);
-subscriptionRouter.put('/:id/cancel', (req, res) =>
-  res.send({
-    title: 'Cancel Subscriptions....',
-  })
-);
-subscriptionRouter.get('/upcoming-renewals', (req, res) =>
-  res.send({
-    title: 'Get upcoming renewals....',
-  })
-);
+subscriptionRouter.put('/:id/cancel', authorize, cancelSubscription);
 
 export default subscriptionRouter;
