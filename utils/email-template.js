@@ -64,7 +64,7 @@ export const generateEmailTemplate = ({
         </tr>
     </table>
 </div>
-`
+`;
 
 export const emailTemplates = [
   {
@@ -91,4 +91,4 @@ export const emailTemplates = [
       `⚡ Final Reminder: ${data.subscriptionName} Renews Tomorrow!`,
     generateBody: (data) => generateEmailTemplate({ ...data, daysLeft: 1 }),
   },
-]
+];

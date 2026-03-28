@@ -1,5 +1,5 @@
-import { createTransport } from 'nodemailer'
-import { EMAIL_PASS, EMAIL_USER } from './env.js'
+import { createTransport } from 'nodemailer';
+import { EMAIL_PASS, EMAIL_USER } from './env.js';
 
 const transporter = createTransport({
   host: 'smtp.ethereal.email',
@@ -10,6 +10,6 @@ const transporter = createTransport({
     user: EMAIL_USER,
     pass: EMAIL_PASS,
   },
-})
+});
 
-export default transporter
+export default transporter;
