@@ -5,7 +5,7 @@ Complete cURL examples for testing the Subscription Tracker API.
 ## Base URL
 
 ```bash
-BASE_URL="http://localhost:3000/api/v1"
+BASE_URL="http://localhost:5500/api/v1"
 ```
 
 Or replace with your deployed URL:
@@ -396,7 +396,7 @@ Here's a complete workflow to test the API:
 ```bash
 #!/bin/bash
 
-BASE_URL="http://localhost:3000/api/v1"
+BASE_URL="http://localhost:5500/api/v1"
 
 # 1. Sign up
 echo "1. Signing up..."
